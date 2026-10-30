@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mona's Octoverse Arcade</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d1117;
+        --panel: #161b22;
+        --panel-border: #30363d;
+        --text: #c9d1d9;
+        --accent: #58a6ff;
+        --good: #3fb950;
+        --danger: #f85149;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 15% 15%, #1f6feb2b, transparent 35%),
+          radial-gradient(circle at 80% 10%, #3fb95030, transparent 40%),
+          radial-gradient(circle at 40% 80%, #bf398930, transparent 35%),
+          var(--bg);
+        color: var(--text);
+        font-family:
+          "Segoe UI",
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 20px;
+      }
+
+      .game-shell {
+        width: min(920px, 100%);
+        border: 1px solid var(--panel-border);
+        border-radius: 14px;
+        overflow: hidden;
+        background: color-mix(in oklab, var(--panel) 94%, black);
+        box-shadow:
+          0 24px 50px rgba(1, 4, 9, 0.6),
+          inset 0 0 0 1px rgba(240, 246, 252, 0.05);
+      }
+
+      .hud {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--panel-border);
+        padding: 12px 16px;
+        font-weight: 600;
+      }
+
+      .hud-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        border: 1px solid var(--panel-border);
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: rgba(240, 246, 252, 0.03);
+        font-size: 13px;
+      }
+
+      .tip {
+        color: #8b949e;
+        font-size: 13px;
+        transition: color 200ms ease;
+      }
+
+      .tip.show {
+        color: #f0f6fc;
+      }
+
+      .playfield {
+        position: relative;
+        background:
+          linear-gradient(rgba(240, 246, 252, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(240, 246, 252, 0.04) 1px, transparent 1px),
+          linear-gradient(135deg, #0d1117 0%, #101a29 100%);
+        background-size:
+          40px 40px,
+          40px 40px,
+          auto;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(1, 4, 9, 0.75);
+      }
+
+      .overlay.show {
+        display: flex;
+      }
+
+      .overlay-card {
+        width: min(460px, calc(100% - 40px));
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        background: #161b22f2;
+        padding: 24px;
+        text-align: center;
+      }
+
+      .overlay h2 {
+        margin: 0 0 10px;
+        color: #f0f6fc;
+      }
+
+      .overlay p {
+        margin: 0 0 18px;
+        color: #9da7b1;
+      }
+
+      button {
+        border: 1px solid color-mix(in oklab, var(--accent) 60%, white);
+        border-radius: 10px;
+        background: color-mix(in oklab, var(--accent) 45%, #0d1117);
+        color: #f0f6fc;
+        font-weight: 700;
+        font-size: 15px;
+        padding: 10px 18px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: color-mix(in oklab, var(--accent) 55%, #0d1117);
+      }
+
+      .legend {
+        border-top: 1px solid var(--panel-border);
+        padding: 10px 16px 14px;
+        font-size: 13px;
+        color: #8b949e;
+      }
+
+      .legend strong {
+        color: #c9d1d9;
+      }
+
+      @media (max-width: 700px) {
+        .hud {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="hud">
+        <div class="hud-group">
+          <span class="pill">Score: <span id="score">0</span></span>
+          <span class="pill">Speed: <span id="speed">1.0x</span></span>
+        </div>
+        <div class="tip" id="copilot-tip">Copilot tip: Grab those green commits, one at a time.</div>
+      </header>
+      <section class="playfield">
+        <canvas id="game" width="900" height="520" aria-label="Mona arcade game"></canvas>
+        <div class="overlay" id="game-over">
+          <div class="overlay-card">
+            <h2>🐙 Game Over</h2>
+            <p id="game-over-text">A bug crashed your streak.</p>
+            <button id="restart" type="button">Restart Run</button>
+          </div>
+        </div>
+      </section>
+      <footer class="legend">
+        <strong>Controls:</strong> Move with arrow keys or WASD • Collect green commit-squares • Dodge red bugs
+      </footer>
+    </main>
+
+    <script>
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+
+      const scoreEl = document.getElementById("score");
+      const speedEl = document.getElementById("speed");
+      const tipEl = document.getElementById("copilot-tip");
+      const gameOverEl = document.getElementById("game-over");
+      const gameOverTextEl = document.getElementById("game-over-text");
+      const restartButton = document.getElementById("restart");
+
+      const tips = [
+        "Copilot tip: Nice work! Keep those commits flowing.",
+        "Copilot tip: Great momentum — ship small wins quickly.",
+        "Copilot tip: You’re crushing it. Watch bug paths before dashing in.",
+        "Copilot tip: Smart play! Keep a little space from each bug swarm.",
+        "Copilot tip: Excellent focus. Angle toward commits, not chaos.",
+      ];
+
+      const input = {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+      };
+
+      const state = {
+        running: true,
+        score: 0,
+        baseSpeed: 220,
+        speedMultiplier: 1,
+        lastTime: performance.now(),
+        nextBugSpawnAt: 0,
+        nextCommitSpawnAt: 0,
+        nextTipScore: 10,
+        tipTimer: 0,
+        player: {
+          x: canvas.width * 0.5,
+          y: canvas.height * 0.5,
+          radius: 18,
+        },
+        commits: [],
+        bugs: [],
+      };
+
+      function randomBetween(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function spawnCommit() {
+        const size = 18;
+        const margin = 28;
+        state.commits.push({
+          x: randomBetween(margin, canvas.width - margin - size),
+          y: randomBetween(margin, canvas.height - margin - size),
+          size,
+          driftX: randomBetween(-22, 22),
+          driftY: randomBetween(-22, 22),
+        });
+      }
+
+      function spawnBug() {
+        const edge = Math.floor(Math.random() * 4);
+        const radius = randomBetween(13, 20);
+        let x = 0;
+        let y = 0;
+
+        if (edge === 0) {
+          x = randomBetween(0, canvas.width);
+          y = -radius * 2;
+        } else if (edge === 1) {
+          x = canvas.width + radius * 2;
+          y = randomBetween(0, canvas.height);
+        } else if (edge === 2) {
+          x = randomBetween(0, canvas.width);
+          y = canvas.height + radius * 2;
+        } else {
+          x = -radius * 2;
+          y = randomBetween(0, canvas.height);
+        }
+
+        const angleToPlayer = Math.atan2(state.player.y - y, state.player.x - x);
+        const speed = randomBetween(90, 150) * state.speedMultiplier;
+
+        state.bugs.push({
+          x,
+          y,
+          radius,
+          vx: Math.cos(angleToPlayer) * speed,
+          vy: Math.sin(angleToPlayer) * speed,
+        });
+      }
+
+      function resetGame() {
+        state.running = true;
+        state.score = 0;
+        state.baseSpeed = 220;
+        state.speedMultiplier = 1;
+        state.nextBugSpawnAt = 0;
+        state.nextCommitSpawnAt = 0;
+        state.nextTipScore = 10;
+        state.tipTimer = 0;
+        state.commits = [];
+        state.bugs = [];
+        state.player.x = canvas.width * 0.5;
+        state.player.y = canvas.height * 0.5;
+        state.lastTime = performance.now();
+
+        scoreEl.textContent = "0";
+        speedEl.textContent = "1.0x";
+        tipEl.textContent = "Copilot tip: Grab those green commits, one at a time.";
+        tipEl.classList.remove("show");
+        gameOverEl.classList.remove("show");
+
+        for (let i = 0; i < 4; i += 1) {
+          spawnCommit();
+        }
+      }
+
+      function triggerTip() {
+        const tip = tips[Math.floor(Math.random() * tips.length)];
+        tipEl.textContent = tip;
+        tipEl.classList.add("show");
+        state.tipTimer = 2.8;
+      }
+
+      function update(dt) {
+        if (!state.running) {
+          return;
+        }
+
+        const moveX = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        const moveY = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+
+        const moveLength = Math.hypot(moveX, moveY) || 1;
+        const moveSpeed = state.baseSpeed * state.speedMultiplier;
+        state.player.x += (moveX / moveLength) * moveSpeed * dt;
+        state.player.y += (moveY / moveLength) * moveSpeed * dt;
+        state.player.x = clamp(state.player.x, state.player.radius, canvas.width - state.player.radius);
+        state.player.y = clamp(state.player.y, state.player.radius, canvas.height - state.player.radius);
+
+        state.speedMultiplier += dt * 0.03;
+        speedEl.textContent = `${state.speedMultiplier.toFixed(1)}x`;
+
+        state.nextCommitSpawnAt -= dt;
+        state.nextBugSpawnAt -= dt;
+
+        const desiredCommitCount = 4 + Math.floor(state.score / 12);
+        if (state.nextCommitSpawnAt <= 0 && state.commits.length < desiredCommitCount) {
+          spawnCommit();
+          state.nextCommitSpawnAt = randomBetween(0.2, 0.55);
+        }
+
+        const maxBugs = Math.min(18, 3 + Math.floor(state.score / 4));
+        if (state.nextBugSpawnAt <= 0 && state.bugs.length < maxBugs) {
+          spawnBug();
+          const minSpawnDelay = Math.max(0.22, 1.1 - state.speedMultiplier * 0.25);
+          const maxSpawnDelay = Math.max(0.35, 1.5 - state.speedMultiplier * 0.3);
+          state.nextBugSpawnAt = randomBetween(minSpawnDelay, maxSpawnDelay);
+        }
+
+        for (const commit of state.commits) {
+          commit.x += commit.driftX * dt;
+          commit.y += commit.driftY * dt;
+
+          if (commit.x <= 0 || commit.x + commit.size >= canvas.width) {
+            commit.driftX *= -1;
+          }
+          if (commit.y <= 0 || commit.y + commit.size >= canvas.height) {
+            commit.driftY *= -1;
+          }
+        }
+
+        for (const bug of state.bugs) {
+          bug.x += bug.vx * dt;
+          bug.y += bug.vy * dt;
+        }
+
+        state.bugs = state.bugs.filter(
+          (bug) =>
+            bug.x > -80 &&
+            bug.y > -80 &&
+            bug.x < canvas.width + 80 &&
+            bug.y < canvas.height + 80,
+        );
+
+        for (let i = state.commits.length - 1; i >= 0; i -= 1) {
+          const commit = state.commits[i];
+          const cx = commit.x + commit.size * 0.5;
+          const cy = commit.y + commit.size * 0.5;
+          const distance = Math.hypot(state.player.x - cx, state.player.y - cy);
+
+          if (distance < state.player.radius + commit.size * 0.6) {
+            state.commits.splice(i, 1);
+            state.score += 1;
+            scoreEl.textContent = String(state.score);
+            if (state.score >= state.nextTipScore) {
+              triggerTip();
+              state.nextTipScore += 10;
+            }
+          }
+        }
+
+        for (const bug of state.bugs) {
+          const distance = Math.hypot(state.player.x - bug.x, state.player.y - bug.y);
+          if (distance < state.player.radius + bug.radius * 0.9) {
+            state.running = false;
+            gameOverTextEl.textContent = `Final score: ${state.score} — bugs win this round.`;
+            gameOverEl.classList.add("show");
+            break;
+          }
+        }
+
+        if (state.tipTimer > 0) {
+          state.tipTimer -= dt;
+          if (state.tipTimer <= 0) {
+            tipEl.classList.remove("show");
+          }
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (const commit of state.commits) {
+          ctx.fillStyle = "#3fb950";
+          ctx.fillRect(commit.x, commit.y, commit.size, commit.size);
+          ctx.strokeStyle = "#2ea043";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(commit.x, commit.y, commit.size, commit.size);
+        }
+
+        for (const bug of state.bugs) {
+          ctx.beginPath();
+          ctx.fillStyle = "#f85149";
+          ctx.arc(bug.x, bug.y, bug.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ff7b72";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.closePath();
+
+          ctx.beginPath();
+          ctx.strokeStyle = "#ffb3ad";
+          ctx.lineWidth = 2;
+          ctx.moveTo(bug.x - bug.radius * 0.9, bug.y);
+          ctx.lineTo(bug.x + bug.radius * 0.9, bug.y);
+          ctx.moveTo(bug.x, bug.y - bug.radius * 0.9);
+          ctx.lineTo(bug.x, bug.y + bug.radius * 0.9);
+          ctx.stroke();
+          ctx.closePath();
+        }
+
+        ctx.beginPath();
+        ctx.fillStyle = "#f0f6fc";
+        ctx.arc(state.player.x, state.player.y, state.player.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.closePath();
+
+        ctx.font = "24px 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🐙", state.player.x, state.player.y + 1);
+      }
+
+      function gameLoop(now) {
+        const dt = Math.min(0.033, (now - state.lastTime) / 1000);
+        state.lastTime = now;
+        update(dt);
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+
+      function onKeyChange(event, isDown) {
+        const key = event.key.toLowerCase();
+        if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key)) {
+          event.preventDefault();
+        }
+
+        if (key === "arrowup" || key === "w") {
+          input.up = isDown;
+        } else if (key === "arrowdown" || key === "s") {
+          input.down = isDown;
+        } else if (key === "arrowleft" || key === "a") {
+          input.left = isDown;
+        } else if (key === "arrowright" || key === "d") {
+          input.right = isDown;
+        }
+      }
+
+      window.addEventListener("keydown", (event) => onKeyChange(event, true));
+      window.addEventListener("keyup", (event) => onKeyChange(event, false));
+
+      restartButton.addEventListener("click", () => {
+        resetGame();
+      });
+
+      resetGame();
+      requestAnimationFrame(gameLoop);
+    </script>
+  </body>
+</html>
