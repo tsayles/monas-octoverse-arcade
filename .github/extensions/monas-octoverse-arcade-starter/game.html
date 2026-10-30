@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mona's Octoverse Arcade</title>
+    <style>
+      :root {
+        --bg-1: #0d1117;
+        --bg-2: #161b22;
+        --panel: rgba(22, 27, 34, 0.9);
+        --panel-border: rgba(240, 246, 252, 0.1);
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --green: #2ea043;
+        --green-soft: #98f5a1;
+        --red: #f85149;
+        --red-soft: #ff9ea3;
+        --purple: #a371f7;
+        --gold: #facc15;
+        --shadow: rgba(0, 0, 0, 0.28);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top, rgba(69, 153, 104, 0.22), transparent 30%),
+          linear-gradient(180deg, var(--bg-2), var(--bg-1));
+        color: var(--text);
+        font-family: Inter, "Segoe UI", sans-serif;
+      }
+
+      .game-shell {
+        width: min(760px, calc(100vw - 30px));
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 18px;
+        box-shadow: 0 18px 48px var(--shadow);
+        overflow: hidden;
+      }
+
+      .hud {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        background: rgba(13, 17, 23, 0.95);
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .title-block {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.1rem, 2vw, 1.5rem);
+      }
+
+      .scoreboard {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-weight: 700;
+      }
+
+      .pill {
+        min-width: 96px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(46, 160, 67, 0.16);
+        border: 1px solid rgba(46, 160, 67, 0.3);
+        color: var(--green-soft);
+        text-align: center;
+      }
+
+      .pill strong {
+        display: block;
+        font-size: 1.25rem;
+        line-height: 1.15;
+      }
+
+      .game-area {
+        position: relative;
+        background: linear-gradient(180deg, rgba(17, 24, 39, 0.7), rgba(12, 17, 22, 0.92));
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: linear-gradient(180deg, rgba(14, 20, 30, 0.9), rgba(17, 24, 33, 0.96));
+      }
+
+      .sidekick {
+        position: absolute;
+        right: 18px;
+        top: 18px;
+        max-width: 230px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        pointer-events: none;
+      }
+
+      .copilot-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #7c3aed, #a78bfa);
+        border: 2px solid rgba(255,255,255,0.28);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35);
+      }
+
+      .copilot-avatar::before {
+        content: "✦";
+        font-size: 1.5rem;
+      }
+
+      .bubble {
+        background: rgba(13, 17, 23, 0.88);
+        border: 1px solid rgba(167, 139, 250, 0.4);
+        border-radius: 14px 14px 14px 2px;
+        padding: 10px 12px;
+        font-size: 0.86rem;
+        line-height: 1.3;
+        color: #f5f3ff;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgba(7, 10, 14, 0.72);
+        backdrop-filter: blur(2px);
+      }
+
+      .overlay.visible {
+        display: grid;
+      }
+
+      .panel {
+        width: min(330px, calc(100% - 36px));
+        padding: 26px 22px;
+        border-radius: 18px;
+        background: rgba(13, 17, 23, 0.96);
+        border: 1px solid rgba(209, 250, 229, 0.15);
+        text-align: center;
+        box-shadow: 0 18px 44px rgba(0,0,0,0.3);
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: clamp(1.6rem, 4vw, 2.2rem);
+      }
+
+      .final-score {
+        margin: 0 0 18px;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--green), #30c46f);
+        color: white;
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 12px 18px;
+        cursor: pointer;
+        box-shadow: 0 8px 20px rgba(46, 160, 67, 0.4);
+        transition: transform 0.15s ease, filter 0.15s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.05);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      @media (max-width: 620px) {
+        .hud {
+          padding: 12px 14px;
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .scoreboard {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .sidekick {
+          right: 12px;
+          top: 12px;
+          max-width: 150px;
+        }
+
+        .bubble {
+          font-size: 0.74rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-shell">
+      <div class="hud">
+        <div class="title-block">
+          <span class="eyebrow">GitHub Arcade</span>
+          <h1>Mona's Octoverse</h1>
+        </div>
+        <div class="scoreboard" aria-live="polite">
+          <div class="pill">Score<strong id="score">0</strong></div>
+          <div class="pill">Speed<strong id="speed">1x</strong></div>
+        </div>
+      </div>
+
+      <div class="game-area">
+        <canvas id="game" width="760" height="440" aria-label="Mona's arcade game"></canvas>
+
+        <div class="sidekick" aria-live="polite">
+          <div class="copilot-avatar" aria-hidden="true"></div>
+          <div id="copilot-tip" class="bubble">Ready when you are, Mona!</div>
+        </div>
+
+        <div id="game-over" class="overlay" aria-live="assertive">
+          <div class="panel">
+            <h2>Game Over</h2>
+            <p class="final-score">Final score: <span id="final-score">0</span></p>
+            <button id="restart-button" type="button">Restart</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      const scoreEl = document.getElementById('score');
+      const speedEl = document.getElementById('speed');
+      const tipEl = document.getElementById('copilot-tip');
+      const gameOverEl = document.getElementById('game-over');
+      const finalScoreEl = document.getElementById('final-score');
+      const restartButton = document.getElementById('restart-button');
+
+      const tips = [
+        'Nice work, Mona! Keep the commit streak alive.',
+        'You’ve got this — stay one move ahead of the bugs.',
+        'Sharp eyes win this round. Keep collecting those commits!',
+        'Power through! Every commit adds momentum.',
+        'GitHub glory is in reach — keep your focus!',
+      ];
+
+      const state = {
+        playing: true,
+        score: 0,
+        elapsed: 0,
+        lastTime: 0,
+        lastTipAt: 0,
+        width: canvas.width,
+        height: canvas.height,
+        spawnTimers: { commit: 0.9, bug: 1.5 },
+      };
+
+      const player = {
+        x: canvas.width / 2,
+        y: canvas.height - 46,
+        width: 46,
+        height: 46,
+        speed: 310,
+      };
+
+      const keys = {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+      };
+
+      const items = [];
+
+      function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+      }
+
+      function randomBetween(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      function showTip() {
+        const message = tips[Math.floor(Math.random() * tips.length)];
+        tipEl.textContent = message;
+      }
+
+      function resetGame() {
+        state.playing = true;
+        state.score = 0;
+        state.elapsed = 0;
+        state.lastTime = 0;
+        state.lastTipAt = 0;
+        state.spawnTimers.commit = 0.9;
+        state.spawnTimers.bug = 1.5;
+        player.x = canvas.width / 2;
+        player.y = canvas.height - 46;
+        items.length = 0;
+        scoreEl.textContent = '0';
+        speedEl.textContent = '1x';
+        finalScoreEl.textContent = '0';
+        tipEl.textContent = 'Ready when you are, Mona!';
+        gameOverEl.classList.remove('visible');
+      }
+
+      function spawnItem(type) {
+        const size = type === 'commit' ? 16 : 20;
+        const x = randomBetween(size, canvas.width - size);
+        const y = -size;
+        const baseSpeed = type === 'commit' ? 150 : 165;
+        const drift = randomBetween(-40, 40);
+        items.push({
+          type,
+          x,
+          y,
+          size,
+          speed: baseSpeed + state.elapsed * 8,
+          drift,
+        });
+      }
+
+      function handleInput(dt) {
+        const moveX = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+        const moveY = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+
+        player.x += moveX * player.speed * dt;
+        player.y += moveY * player.speed * dt;
+
+        player.x = clamp(player.x, 28, canvas.width - 28);
+        player.y = clamp(player.y, 26, canvas.height - 26);
+      }
+
+      function checkCollisions() {
+        for (let i = items.length - 1; i >= 0; i -= 1) {
+          const item = items[i];
+          const dx = item.x - player.x;
+          const dy = item.y - player.y;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance < (item.size + 18)) {
+            if (item.type === 'commit') {
+              state.score += 1;
+              scoreEl.textContent = String(state.score);
+              if (state.score - state.lastTipAt >= 10) {
+                state.lastTipAt = state.score;
+                showTip();
+              }
+            } else {
+              state.playing = false;
+              finalScoreEl.textContent = String(state.score);
+              gameOverEl.classList.add('visible');
+              return;
+            }
+
+            items.splice(i, 1);
+          }
+        }
+      }
+
+      function update(dt) {
+        state.elapsed += dt;
+        const speedMultiplier = 1 + state.elapsed * 0.08;
+        speedEl.textContent = `${Math.min(10, speedMultiplier).toFixed(1)}x`;
+
+        handleInput(dt);
+
+        state.spawnTimers.commit -= dt;
+        state.spawnTimers.bug -= dt;
+
+        if (state.spawnTimers.commit <= 0) {
+          spawnItem('commit');
+          state.spawnTimers.commit = Math.max(0.52, 1.1 - state.elapsed * 0.03);
+        }
+
+        if (state.spawnTimers.bug <= 0) {
+          spawnItem('bug');
+          state.spawnTimers.bug = Math.max(0.8, 1.8 - state.elapsed * 0.02);
+        }
+
+        for (let i = items.length - 1; i >= 0; i -= 1) {
+          const item = items[i];
+          item.y += (item.speed * speedMultiplier) * dt;
+          item.x += item.drift * dt;
+
+          if (item.x < item.size || item.x > canvas.width - item.size) {
+            item.drift *= -1;
+          }
+
+          if (item.y > canvas.height + item.size) {
+            items.splice(i, 1);
+          }
+        }
+
+        checkCollisions();
+      }
+
+      function drawOctocat(x, y, size) {
+        const bodyX = x;
+        const bodyY = y;
+
+        ctx.fillStyle = '#f0f0f0';
+        ctx.beginPath();
+        ctx.arc(bodyX, bodyY, size * 0.58, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#1f2328';
+        ctx.beginPath();
+        ctx.arc(bodyX - size * 0.16, bodyY - size * 0.12, 3.2, 0, Math.PI * 2);
+        ctx.arc(bodyX + size * 0.16, bodyY - size * 0.12, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#1f2328';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(bodyX, bodyY + 6, size * 0.2, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#0d1117';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(bodyX - size * 0.32, bodyY + size * 0.28);
+        ctx.lineTo(bodyX - size * 0.06, bodyY + size * 0.18);
+        ctx.lineTo(bodyX + size * 0.32, bodyY + size * 0.28);
+        ctx.stroke();
+
+        ctx.fillStyle = '#3c4146';
+        ctx.beginPath();
+        ctx.arc(bodyX - size * 0.54, bodyY + size * 0.04, size * 0.14, 0, Math.PI * 2);
+        ctx.arc(bodyX + size * 0.54, bodyY + size * 0.04, size * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f4f4f4';
+        ctx.fillRect(bodyX - size * 0.48, bodyY + size * 0.18, size * 0.96, size * 0.16);
+      }
+
+      function drawCommitSquare(x, y, size) {
+        ctx.fillStyle = '#2ea043';
+        ctx.fillRect(x - size, y - size, size * 2, size * 2);
+        ctx.fillStyle = '#98f5a1';
+        ctx.fillRect(x - size * 0.55, y - size * 0.55, size * 1.1, size * 1.1);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.strokeRect(x - size, y - size, size * 2, size * 2);
+      }
+
+      function drawBug(x, y, size) {
+        ctx.fillStyle = '#f85149';
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffd6d2';
+        ctx.beginPath();
+        ctx.arc(x - size * 0.3, y - size * 0.1, size * 0.22, 0, Math.PI * 2);
+        ctx.arc(x + size * 0.3, y - size * 0.1, size * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#5a0d0d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x - size * 0.38, y + size * 0.3);
+        ctx.lineTo(x - size * 0.12, y + size * 0.1);
+        ctx.lineTo(x + size * 0.12, y + size * 0.1);
+        ctx.lineTo(x + size * 0.38, y + size * 0.3);
+        ctx.stroke();
+      }
+
+      function drawBackground() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        sky.addColorStop(0, '#101a2b');
+        sky.addColorStop(1, '#0d1117');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = 'rgba(48, 65, 81, 0.8)';
+        for (let i = 0; i < 30; i += 1) {
+          const x = (i * 51 + (state.elapsed * 14)) % (canvas.width + 60);
+          const y = 30 + (i % 9) * 20;
+          ctx.fillRect(x, y, 26, 6);
+        }
+
+        ctx.fillStyle = '#1f6feb';
+        for (let i = 0; i < 28; i += 1) {
+          const x = (i * 47 + (state.elapsed * 32)) % (canvas.width + 70);
+          ctx.fillRect(x, canvas.height - 18 - (i % 5) * 5, 26, 12);
+        }
+      }
+
+      function draw() {
+        drawBackground();
+
+        for (const item of items) {
+          if (item.type === 'commit') {
+            drawCommitSquare(item.x, item.y, item.size);
+          } else {
+            drawBug(item.x, item.y, item.size);
+          }
+        }
+
+        drawOctocat(player.x, player.y, 24);
+      }
+
+      function gameLoop(timestamp) {
+        if (!state.lastTime) {
+          state.lastTime = timestamp;
+        }
+
+        const dt = Math.min((timestamp - state.lastTime) / 1000, 0.033);
+        state.lastTime = timestamp;
+
+        if (state.playing) {
+          update(dt);
+        }
+
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+
+      document.addEventListener('keydown', (event) => {
+        const key = event.key.toLowerCase();
+        if (key === 'arrowleft' || key === 'a') keys.left = true;
+        if (key === 'arrowright' || key === 'd') keys.right = true;
+        if (key === 'arrowup' || key === 'w') keys.up = true;
+        if (key === 'arrowdown' || key === 's') keys.down = true;
+      });
+
+      document.addEventListener('keyup', (event) => {
+        const key = event.key.toLowerCase();
+        if (key === 'arrowleft' || key === 'a') keys.left = false;
+        if (key === 'arrowright' || key === 'd') keys.right = false;
+        if (key === 'arrowup' || key === 'w') keys.up = false;
+        if (key === 'arrowdown' || key === 's') keys.down = false;
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const relativeX = ((event.clientX - rect.left) / rect.width) * canvas.width;
+        const relativeY = ((event.clientY - rect.top) / rect.height) * canvas.height;
+        player.x = clamp(relativeX, 28, canvas.width - 28);
+        player.y = clamp(relativeY, 26, canvas.height - 26);
+      });
+
+      restartButton.addEventListener('click', () => {
+        resetGame();
+      });
+
+      resetGame();
+      requestAnimationFrame(gameLoop);
+    </script>
+  </body>
+</html>
